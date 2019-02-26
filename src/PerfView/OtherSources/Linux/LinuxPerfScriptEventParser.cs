@@ -733,27 +733,30 @@ namespace Diagnostics.Tracing.StackSources
 
             foreach (var entry in archive.Entries)
             {
-                if (MapFilePatterns.IsMatch(entry.FullName))
+                if (entry.Length > 0)
                 {
-                    Mapper mapper = new Mapper();
+                    if (MapFilePatterns.IsMatch(entry.FullName))
+                    {
+                        Mapper mapper = new Mapper();
 
-                    // Register the mapper both with and without the .ni extension.
-                    // Old versions of the runtime contain native images with the .ni extension.
-                    fileSymbolMappers[LinuxPerfScriptEventParser.GetFileNameWithoutExtension(entry.FullName, false)] = mapper;
-                    fileSymbolMappers[LinuxPerfScriptEventParser.GetFileNameWithoutExtension(entry.FullName, true)] = mapper;
-                    using (Stream stream = entry.Open())
-                    {
-                        parser.ParseSymbolFile(stream, mapper);
+                        // Register the mapper both with and without the .ni extension.
+                        // Old versions of the runtime contain native images with the .ni extension.
+                        fileSymbolMappers[LinuxPerfScriptEventParser.GetFileNameWithoutExtension(entry.FullName, false)] = mapper;
+                        fileSymbolMappers[LinuxPerfScriptEventParser.GetFileNameWithoutExtension(entry.FullName, true)] = mapper;
+                        using (Stream stream = entry.Open())
+                        {
+                            parser.ParseSymbolFile(stream, mapper);
+                        }
+                        mapper.DoneMapping();
                     }
-                    mapper.DoneMapping();
-                }
-                else if (PerfInfoPattern.IsMatch(LinuxPerfScriptEventParser.GetFileName(entry.FullName)))
-                {
-                    Dictionary<string, string> guids = new Dictionary<string, string>();
-                    processDllGuids[LinuxPerfScriptEventParser.GetFileName(entry.FullName)] = guids;
-                    using (Stream stream = entry.Open())
+                    else if (PerfInfoPattern.IsMatch(LinuxPerfScriptEventParser.GetFileName(entry.FullName)))
                     {
-                        parser.ParsePerfInfoFile(stream, guids);
+                        Dictionary<string, string> guids = new Dictionary<string, string>();
+                        processDllGuids[LinuxPerfScriptEventParser.GetFileName(entry.FullName)] = guids;
+                        using (Stream stream = entry.Open())
+                        {
+                            parser.ParsePerfInfoFile(stream, guids);
+                        }
                     }
                 }
             }
@@ -787,6 +790,9 @@ namespace Diagnostics.Tracing.StackSources
         {
             symbol = "";
             startLocation = 0;
+
+            if (!maps.Any())
+                return false;
 
             int start = 0;
             int end = maps.Count;
